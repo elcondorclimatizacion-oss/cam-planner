@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planificador de Cobertura de Cámaras FOV</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Área Principal del Lienzo -->
+        <main class="canvas-container" id="canvasContainer">
+            <canvas id="editorCanvas"></canvas>
+            
+            <!-- Barra de Herramientas Flotante -->
+            <div class="floating-toolbar">
+                <button id="btnCalibrate" class="tool-btn" title="Calibrar Escala (Dibuja una línea en el plano)">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M4 7V4h3M20 7V4h-3M4 17v3h3M20 17v3h-3M9 12h6M9 9l-3 3 3 3M15 9l3 3-3 3"/></svg>
+                    <span>Calibrar</span>
+                </button>
+                <button id="btnDrawDimension" class="tool-btn" title="Dibujar Cota/Medida (Dibuja una línea en el mapa para anotar distancias)">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M5 3v18M19 3v18M5 12h14M8 9l-3 3 3 3M16 9l3 3-3 3"/></svg>
+                    <span>Medida</span>
+                </button>
+                <div class="divider"></div>
+                <button id="btnZoomIn" class="tool-btn" title="Acercar">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+                </button>
+                <button id="btnZoomOut" class="tool-btn" title="Alejar">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+                </button>
+                <button id="btnZoomReset" class="tool-btn" title="Ajustar Pantalla">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                </button>
+                <div class="divider"></div>
+                <button id="btnClear" class="tool-btn danger" title="Eliminar Todas las Cámaras">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+                <button id="btnExport" class="tool-btn success" title="Exportar Diseño a PNG">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                    <span>Exportar PNG</span>
+                </button>
+            </div>
+
+            <!-- Indicadores de estado flotantes -->
+            <div class="scale-indicator" id="scaleIndicator">Escala: Sin calibrar (1px = 1px)</div>
+            
+            <div class="instructions-overlay" id="instructionsOverlay">
+                <span class="close-instructions" id="btnCloseInstructions">&times;</span>
+                <h3>Atajos y Controles</h3>
+                <ul>
+                    <li><kbd>Rueda del Mouse</kbd> para hacer Zoom.</li>
+                    <li><kbd>Click Derecho + Arrastrar</kbd> o <kbd>Espacio + Click Izquierdo</kbd> para moverte por el plano.</li>
+                    <li><kbd>Click Izquierdo</kbd> sobre una cámara para seleccionarla. Arrástrala para moverla.</li>
+                    <li>Usa el manejador circular del haz (gizmo) para rotar la cámara directamente en el mapa.</li>
+                </ul>
+            </div>
+        </main>
+
+        <!-- Panel de Control Lateral -->
+        <aside class="sidebar">
+            <header class="sidebar-header">
+                <div class="logo">
+                    <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" stroke-width="2.5" fill="none" class="logo-icon"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                    <h2>CamPlanner <span class="badge">PRO</span></h2>
+                </div>
+                <p>Planificador de Haces de Visión & Alcance</p>
+            </header>
+
+            <div class="sidebar-content">
+                <!-- Sección 1: Plano de Fondo -->
+                <section class="panel-section">
+                    <h3 class="section-title">1. Plano de Fondo</h3>
+                    <div class="file-uploader">
+                        <label for="imageUpload" class="upload-label">
+                            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                            <span>Subir Imagen o Plano</span>
+                            <span class="file-types">PNG, JPG, JPEG</span>
+                        </label>
+                        <input type="file" id="imageUpload" accept="image/*" class="file-input">
+                    </div>
+                    <div class="sample-images">
+                        <button class="sample-btn" id="samplePlan1">Plano Demo 1 (Terreno)</button>
+                        <button class="sample-btn" id="samplePlan2">Plano Demo 2 (Fábrica)</button>
+                    </div>
+                </section>
+
+                <!-- Sección 2: Calibración de Escala -->
+                <section class="panel-section" id="sectionCalibration">
+                    <div class="section-header-row">
+                        <h3 class="section-title">2. Calibración de Escala</h3>
+                        <span class="status-dot" id="calibrationStatusDot"></span>
+                    </div>
+                    
+                    <!-- Selector de Método de Calibración -->
+                    <div class="calibration-method-selector" style="display: flex; gap: 6px; margin-bottom: 12px; background: rgba(9, 11, 17, 0.4); padding: 3px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <button type="button" id="btnMethodDims" class="tab-btn-calib active" style="flex: 1;">Medidas Totales</button>
+                        <button type="button" id="btnMethodLine" class="tab-btn-calib" style="flex: 1;">Línea de Referencia</button>
+                    </div>
+
+                    <!-- Método A: Medidas Totales -->
+                    <div id="panelCalibDims" class="calib-subpanel">
+                        <p class="section-desc">Ingresa las dimensiones reales estimadas para toda la imagen. El largo se calculará según la proporción de la foto.</p>
+                        <div class="form-row">
+                            <div class="form-group col">
+                                <label for="calibTotalWidth">Ancho Total (m)</label>
+                                <input type="number" id="calibTotalWidth" value="100" min="1" step="1">
+                            </div>
+                            <div class="form-group col">
+                                <label for="calibTotalLength">Largo Total (m)</label>
+                                <input type="number" id="calibTotalLength" value="75" min="1" step="1" readonly style="background: rgba(255, 255, 255, 0.03); color: var(--text-muted); cursor: not-allowed; border-color: rgba(255, 255, 255, 0.03);">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="calibTotalHeight">Altura del Techo / Máx (m)</label>
+                            <input type="number" id="calibTotalHeight" value="6" min="1" step="0.5">
+                        </div>
+                        <button id="btnApplyTotalDims" class="btn btn-primary w-100 btn-sm" style="margin-top: 4px;">
+                            Aplicar Medidas Totales
+                        </button>
+                    </div>
+
+                    <!-- Método B: Línea de Referencia -->
+                    <div id="panelCalibLine" class="calib-subpanel" style="display: none;">
+                        <p class="section-desc">Dibuja una línea sobre un objeto del plano del cual conozcas su longitud real (ej: un portón o pared).</p>
+                        <button id="btnStartCalibrate" class="btn btn-secondary w-100 btn-sm">
+                            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" style="margin-right: 6px; vertical-align: middle;"><path d="M4 7V4h3M20 7V4h-3M4 17v3h3M20 17v3h-3M9 12h6"/></svg>
+                            Trazar Línea en Mapa
+                        </button>
+                        
+                        <!-- Panel de Entrada de Calibración (Oculto por defecto) -->
+                        <div class="calibration-input-box" id="calibrationInputBox" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); display: none;">
+                            <p>Ingresa la distancia de la línea trazada:</p>
+                            <div class="input-group">
+                                <input type="number" id="calibMeters" value="10" min="0.1" step="0.5">
+                                <span class="input-suffix">metros</span>
+                            </div>
+                            <div class="btn-group" style="margin-top: 8px; display: flex; gap: 8px;">
+                                <button id="btnSaveCalib" class="btn btn-primary btn-sm" style="flex: 1;">Guardar</button>
+                                <button id="btnCancelCalib" class="btn btn-outline btn-sm" style="flex: 1;">Cancelar</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Sección 3: Añadir Cámaras -->
+                <section class="panel-section">
+                    <h3 class="section-title">3. Añadir Cámara</h3>
+                    
+                    <div class="form-group">
+                        <label for="brandFilter">Marca de Cámara</label>
+                        <select id="brandFilter">
+                            <option value="all">Todas las marcas</option>
+                            <option value="uniview">Uniview (UNV)</option>
+                            <option value="dahua">Dahua</option>
+                            <option value="ezviz">Ezviz</option>
+                            <option value="imou">Imou</option>
+                            <option value="custom">Personalizadas (Guardadas)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cameraModelSelect">Modelo de Cámara</label>
+                        <select id="cameraModelSelect">
+                            <!-- Se llena dinámicamente con JS -->
+                        </select>
+                    </div>
+
+                    <div class="model-specs" id="modelSpecsBox">
+                        <!-- Especificaciones dinámicas -->
+                    </div>
+
+                    <button id="btnAddCamera" class="btn btn-primary w-100">
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" style="margin-right: 6px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        Añadir al Plano
+                    </button>
+
+                    <!-- Crear Modelo Personalizado (Colapsable) -->
+                    <div class="custom-model-accordion">
+                        <button class="accordion-trigger" id="btnToggleCustomModelForm">
+                            <span>+ Crear Modelo Personalizado</span>
+                        </button>
+                        <div class="accordion-content" id="customModelForm">
+                            <div class="form-group">
+                                <label for="newCamBrand">Marca</label>
+                                <select id="newCamBrand">
+                                    <option value="Uniview">Uniview</option>
+                                    <option value="Dahua">Dahua</option>
+                                    <option value="Ezviz">Ezviz</option>
+                                    <option value="Imou">Imou</option>
+                                    <option value="Custom">Genérica/Otra</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="newCamName">Nombre Modelo</label>
+                                <input type="text" id="newCamName" placeholder="Ej. IPC-HFW3841T-ZAS">
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group col">
+                                    <label for="newCamFOV">Ángulo (FOV °)</label>
+                                    <input type="number" id="newCamFOV" value="90" min="10" max="180">
+                                </div>
+                                <div class="form-group col">
+                                    <label for="newCamRange">Alcance IR (m)</label>
+                                    <input type="number" id="newCamRange" value="30" min="1" max="1000">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="newCamLens">Lente (Ej. 2.8mm - 12mm)</label>
+                                <input type="text" id="newCamLens" value="4mm">
+                            </div>
+                            <button id="btnSaveCustomModel" class="btn btn-secondary btn-sm w-100">Guardar Modelo</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Sección 4: Cámaras Activas -->
+                <section class="panel-section">
+                    <div class="section-header-row">
+                        <h3 class="section-title">4. Cámaras Activas (<span id="activeCamCount">0</span>)</h3>
+                    </div>
+                    <div class="active-cameras-list" id="activeCamerasList">
+                        <div class="no-cameras-placeholder">
+                            No has agregado cámaras al plano. Presiona "Añadir al Plano" o haz doble clic en el lienzo.
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Sección 5: Cotas en Plano -->
+                <section class="panel-section">
+                    <h3 class="section-title">5. Cotas en Plano (<span id="activeCotasCount">0</span>)</h3>
+                    <div class="active-cotas-list" id="activeCotasList" style="display: flex; flex-direction: column; gap: 6px; max-height: 150px; overflow-y: auto; padding-right: 4px;">
+                        <div class="no-cotas-placeholder" style="font-size: 12px; color: var(--text-muted); text-align: center; padding: 12px; border: 1px dashed var(--border-color); border-radius: var(--radius-sm);">
+                            No hay cotas en el plano. Usa el botón "Medida" arriba para marcar distancias.
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Sección 6: Guardar y Cargar Proyecto -->
+                <section class="panel-section">
+                    <h3 class="section-title">6. Guardar/Cargar Proyecto</h3>
+                    <p class="section-desc">Guarda el diseño completo (plano, calibración, cámaras y cotas) en un archivo JSON en tu PC para abrirlo después.</p>
+                    <div class="btn-group" style="display: flex; gap: 8px;">
+                        <button id="btnExportProject" class="btn btn-secondary btn-sm w-100">Guardar JSON</button>
+                        <button id="btnImportProjectTrigger" class="btn btn-secondary btn-sm w-100">Cargar JSON</button>
+                    </div>
+                    <input type="file" id="projectJSONUpload" accept=".json" style="display: none;">
+                </section>
+
+                <!-- Sección 7: Ficha Técnica e Impresión -->
+                <section class="panel-section">
+                    <h3 class="section-title">7. Reporte Técnico</h3>
+                    <p class="section-desc">Genera una propuesta formal para tu cliente con presupuesto y ficha técnica de cámaras.</p>
+                    
+                    <div class="form-group" style="margin-top: 8px;">
+                        <label for="reportClientName">Nombre del Cliente / Empresa</label>
+                        <input type="text" id="reportClientName" placeholder="Ej. El Cóndor S.A.">
+                    </div>
+                    
+                    <div class="form-row" style="margin-top: 6px;">
+                        <div class="form-group col" style="flex: 1;">
+                            <label for="reportLaborBudget">Presupuesto Mano de Obra ($)</label>
+                            <input type="text" id="reportLaborBudget" placeholder="Ej. $150.000">
+                        </div>
+                        <div class="form-group col" style="flex: 1;">
+                            <label for="reportProjectDate">Fecha del Proyecto</label>
+                            <input type="date" id="reportProjectDate">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group" style="margin-top: 6px;">
+                        <label for="reportObservations">Notas / Observaciones del Proyecto</label>
+                        <textarea id="reportObservations" rows="3" placeholder="Detalles de instalación, cableado, canalización, etc." style="width:100%; font-family:inherit; font-size:12px; background:rgba(0,0,0,0.25); border:1px solid var(--border-color); border-radius:4px; color:#fff; padding:6px; resize:vertical; box-sizing:border-box;"></textarea>
+                    </div>
+                    
+                    <button id="btnPrintReport" class="btn btn-primary btn-sm w-100" style="margin-top: 8px;">
+                        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" style="margin-right: 6px; vertical-align: middle;"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg>
+                        Imprimir / Guardar PDF
+                    </button>
+                </section>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Modal de Confirmación de Borrado de Calibración / Calibrando -->
+    <div class="modal-backdrop" id="calibrationModal">
+        <div class="modal-box">
+            <h3>Modo Calibración Activado</h3>
+            <p>1. Haz un clic izquierdo en el plano para iniciar la línea de calibración.</p>
+            <p>2. Arrastra y haz clic en el segundo punto (ej. el ancho de un portón, camino o pared).</p>
+            <p>3. Ingresa los metros de esa distancia en el panel derecho y haz clic en Guardar.</p>
+            <button id="btnCloseCalibModal" class="btn btn-primary btn-sm">Entendido</button>
+        </div>
+    </div>
+
+    <!-- Modal para ingresar el valor de la Cota -->
+    <div class="modal-backdrop" id="dimensionModal">
+        <div class="modal-box">
+            <h3>Nueva Cota / Medida</h3>
+            <p>Ingresa la distancia real o descripción para la línea trazada en el plano:</p>
+            <div class="form-group" style="margin-top: 12px; margin-bottom: 16px;">
+                <label for="dimLabelInput">Distancia / Texto (Ej: 72m o Muro Oeste: 72m)</label>
+                <input type="text" id="dimLabelInput" placeholder="Ej: 72 metros">
+            </div>
+            <div class="btn-group" style="display: flex; gap: 8px;">
+                <button id="btnSaveDimension" class="btn btn-primary btn-sm" style="flex: 1;">Guardar Cota</button>
+                <button id="btnCancelDimension" class="btn btn-outline btn-sm" style="flex: 1;">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenedor de Impresión (Oculto en pantalla, visible en PDF/papel) -->
+    <div id="printReportContainer" class="print-only"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
