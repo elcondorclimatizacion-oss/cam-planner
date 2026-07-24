@@ -107,7 +107,7 @@ const CAMERA_PRESETS = [
     {
         brand: 'uniview',
         brandName: 'Uniview',
-        model: 'TIC2621SR-F3-4F4AC-VD (Bala Térmica Bi-espectral)',
+        model: 'TIC2621SR-F3-4F4AC-VD (Bala Térmica 3.2mm)',
         fov: 57.0,
         range: 120,
         lens: 'Térmica 3.2mm / Óptica 4mm',
@@ -116,11 +116,92 @@ const CAMERA_PRESETS = [
     {
         brand: 'uniview',
         brandName: 'Uniview',
-        model: 'TIC3612SA-F7-4F6AC-I1 (Domo Térmico Bi-espectral)',
+        model: 'TIC3612SA-F3-4F4AC-I1 (Domo Térmico 3.2mm)',
+        fov: 57.0,
+        range: 120,
+        lens: 'Térmica 3.2mm / Óptica 4mm',
+        color: '#fb7185'
+    },
+    {
+        brand: 'uniview',
+        brandName: 'Uniview',
+        model: 'TIC3612SA-F7-4F6AC-I1 (Domo Térmico 6.9mm)',
         fov: 25.0,
         range: 250,
         lens: 'Térmica 6.9mm / Óptica 6mm',
         color: '#dc2626'
+    },
+    {
+        brand: 'uniview',
+        brandName: 'Uniview',
+        model: 'TIC2A32SA-F3-4F4AC-I1 (Bala Térmica SIP 3.2mm)',
+        fov: 57.0,
+        range: 120,
+        lens: 'Térmica 3.2mm / Óptica 4mm',
+        color: '#f43f5e'
+    },
+    {
+        brand: 'uniview',
+        brandName: 'Uniview',
+        model: 'TIC2A32SA-F7-4F6AC-I1 (Bala Térmica SIP 6.9mm)',
+        fov: 25.0,
+        range: 250,
+        lens: 'Térmica 6.9mm / Óptica 6mm',
+        color: '#b91c1c'
+    },
+    {
+        brand: 'uniview',
+        brandName: 'Uniview',
+        model: 'TIC2A32SA-F10-4F8AC-I1 (Bala Térmica SIP 9.7mm)',
+        fov: 18.0,
+        range: 350,
+        lens: 'Térmica 9.7mm / Óptica 8mm',
+        color: '#991b1b'
+    },
+    {
+        brand: 'uniview',
+        brandName: 'Uniview',
+        model: 'TIC2624S-F10-4F6AC-I3 (Bala Térmica SIP 10mm)',
+        fov: 24.0,
+        range: 350,
+        lens: 'Térmica 10mm / Óptica 6mm',
+        color: '#ea580c'
+    },
+    {
+        brand: 'uniview',
+        brandName: 'Uniview',
+        model: 'TIC2624S-F25-4F12AC-I3 (Bala Térmica SIP 25mm)',
+        fov: 9.6,
+        range: 800,
+        lens: 'Térmica 25mm / Óptica 12mm',
+        color: '#d97706'
+    },
+    {
+        brand: 'uniview',
+        brandName: 'Uniview',
+        model: 'TIC2624S-F35-4F12AC-I3 (Bala Térmica SIP 35mm)',
+        fov: 6.9,
+        range: 1200,
+        lens: 'Térmica 35mm / Óptica 12mm',
+        color: '#ca8a04'
+    },
+    {
+        brand: 'uniview',
+        brandName: 'Uniview',
+        model: 'TIC6424S-F25-I3 (Domo PTZ Térmico 25mm)',
+        fov: 9.6,
+        range: 800,
+        lens: 'Térmica 25mm',
+        color: '#e11d48'
+    },
+    {
+        brand: 'uniview',
+        brandName: 'Uniview',
+        model: 'TIC6424S-F50-I3 (Domo PTZ Térmico 50mm)',
+        fov: 4.8,
+        range: 1600,
+        lens: 'Térmica 50mm',
+        color: '#be123c'
     },
     // --- DAHUA ---
     {
