@@ -104,6 +104,24 @@ const CAMERA_PRESETS = [
         lens: 'Láser',
         color: '#10b981'
     },
+    {
+        brand: 'uniview',
+        brandName: 'Uniview',
+        model: 'TIC2621SR-F3-4F4AC-VD (Bala Térmica Bi-espectral)',
+        fov: 57.0,
+        range: 120,
+        lens: 'Térmica 3.2mm / Óptica 4mm',
+        color: '#f43f5e'
+    },
+    {
+        brand: 'uniview',
+        brandName: 'Uniview',
+        model: 'TIC3612SA-F7-4F6AC-I1 (Domo Térmico Bi-espectral)',
+        fov: 25.0,
+        range: 250,
+        lens: 'Térmica 6.9mm / Óptica 6mm',
+        color: '#dc2626'
+    },
     // --- DAHUA ---
     {
         brand: 'dahua',
