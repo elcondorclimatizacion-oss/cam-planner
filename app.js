@@ -481,7 +481,12 @@ function setupEventListeners() {
     btnPrintReport.addEventListener('click', printTechnicalReport);
     
     // Cerrar Instrucciones
-    btnCloseInstructions.addEventListener('click', () => instructionsOverlay.style.opacity = '0');
+    btnCloseInstructions.addEventListener('click', () => {
+        instructionsOverlay.style.opacity = '0';
+        setTimeout(() => {
+            instructionsOverlay.style.display = 'none';
+        }, 300);
+    });
     
     // Doble Click para agregar cámara rápido
     canvas.addEventListener('dblclick', handleDoubleClick);
