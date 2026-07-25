@@ -1299,6 +1299,38 @@ function pathDistanceBetweenProjections(points, proj1, proj2) {
     return totalD;
 }
 
+// Trazar línea de cable recorriendo los segmentos de la cañería en el canvas
+function drawPathAlongConduit(context, points, proj1, proj2) {
+    let idx1 = proj1.segmentIndex;
+    let idx2 = proj2.segmentIndex;
+    let p1 = proj1.point;
+    let p2 = proj2.point;
+    
+    context.beginPath();
+    context.moveTo(p1.x, p1.y);
+    
+    if (idx1 === idx2) {
+        context.lineTo(p2.x, p2.y);
+    } else {
+        if (idx1 > idx2) {
+            let temp = idx1; idx1 = idx2; idx2 = temp;
+            let tempP = p1; p1 = p2; p2 = tempP;
+        }
+        
+        // Dibujar hacia el final del primer segmento
+        context.lineTo(points[idx1 + 1].x, points[idx1 + 1].y);
+        
+        // Puntos intermedios
+        for (let i = idx1 + 1; i < idx2; i++) {
+            context.lineTo(points[i+1].x, points[i+1].y);
+        }
+        
+        // Hasta el punto final
+        context.lineTo(p2.x, p2.y);
+    }
+    context.stroke();
+}
+
 // Función para calcular la distancia real 3D (Opción B)
 function calculateRealDistance(cam) {
     if (!appState.rack) return 0;
@@ -2241,24 +2273,85 @@ function draw() {
     // 8. Dibujar Líneas de Cableado al Rack
     if (appState.rack && appState.showCables) {
         appState.cameras.forEach(cam => {
-            const dx = cam.x - appState.rack.x;
-            const dy = cam.y - appState.rack.y;
             const distReal = calculateRealDistance(cam);
             
             ctx.save();
-            ctx.strokeStyle = 'rgba(6, 182, 212, 0.45)'; // Cyan translúcido
+            ctx.strokeStyle = 'rgba(6, 182, 212, 0.55)'; // Cyan translúcido
             ctx.lineWidth = 1 / appState.zoomScale;
             ctx.setLineDash([4 / appState.zoomScale, 5 / appState.zoomScale]);
             
-            ctx.beginPath();
-            ctx.moveTo(appState.rack.x, appState.rack.y);
-            ctx.lineTo(cam.x, cam.y);
-            ctx.stroke();
+            let labelX = cam.x;
+            let labelY = cam.y;
             
-            // Dibujar los metros de cable en el punto medio de la línea
-            const midX = (cam.x + appState.rack.x) / 2;
-            const midY = (cam.y + appState.rack.y) / 2;
+            // Si hay cañerías trazadas, dibujar la ruta por la cañería
+            if (appState.conduits && appState.conduits.length > 0) {
+                let minTotalDist = Infinity;
+                let bestCond = null;
+                let bestRackProj = null;
+                let bestCamProj = null;
+                
+                appState.conduits.forEach(cond => {
+                    if (cond.points.length < 2) return;
+                    const rackProj = projectPointToPath(appState.rack, cond.points);
+                    const camProj = projectPointToPath(cam, cond.points);
+                    const distRackToCond = rackProj.distanceToPath;
+                    const distCamToCond = camProj.distanceToPath;
+                    const distAlongCond = pathDistanceBetweenProjections(cond.points, rackProj, camProj);
+                    const total2D = distRackToCond + distAlongCond + distCamToCond;
+                    
+                    if (total2D < minTotalDist) {
+                        minTotalDist = total2D;
+                        bestCond = cond;
+                        bestRackProj = rackProj;
+                        bestCamProj = camProj;
+                    }
+                });
+                
+                if (bestCond) {
+                    // 1. Tramo Rack -> Cañería
+                    ctx.beginPath();
+                    ctx.moveTo(appState.rack.x, appState.rack.y);
+                    ctx.lineTo(bestRackProj.point.x, bestRackProj.point.y);
+                    ctx.stroke();
+                    
+                    // 2. Tramo por la Cañería
+                    drawPathAlongConduit(ctx, bestCond.points, bestRackProj, bestCamProj);
+                    
+                    // 3. Tramo Cañería -> Cámara
+                    ctx.beginPath();
+                    ctx.moveTo(bestCamProj.point.x, bestCamProj.point.y);
+                    ctx.lineTo(cam.x, cam.y);
+                    ctx.stroke();
+                    
+                    // Colocar etiqueta en el tramo de bajada/conexión
+                    labelX = (bestCamProj.point.x + cam.x) / 2;
+                    labelY = (bestCamProj.point.y + cam.y) / 2;
+                    const dx = cam.x - bestCamProj.point.x;
+                    const dy = cam.y - bestCamProj.point.y;
+                    if (Math.sqrt(dx*dx + dy*dy) < 15) {
+                        labelX = cam.x;
+                        labelY = cam.y - 14 / appState.zoomScale;
+                    }
+                } else {
+                    // Fallback línea recta
+                    ctx.beginPath();
+                    ctx.moveTo(appState.rack.x, appState.rack.y);
+                    ctx.lineTo(cam.x, cam.y);
+                    ctx.stroke();
+                    labelX = (cam.x + appState.rack.x) / 2;
+                    labelY = (cam.y + appState.rack.y) / 2;
+                }
+            } else {
+                // Sin cañerías
+                ctx.beginPath();
+                ctx.moveTo(appState.rack.x, appState.rack.y);
+                ctx.lineTo(cam.x, cam.y);
+                ctx.stroke();
+                labelX = (cam.x + appState.rack.x) / 2;
+                labelY = (cam.y + appState.rack.y) / 2;
+            }
             
+            // Dibujar los metros de cable
             ctx.fillStyle = '#22d3ee';
             ctx.font = `bold ${Math.max(8, 9 / appState.zoomScale)}px Outfit`;
             ctx.textAlign = 'center';
@@ -2268,10 +2361,10 @@ function draw() {
             ctx.fillStyle = 'rgba(9, 11, 17, 0.85)';
             const distStr = `${Math.round(distReal)}m`;
             const dW = ctx.measureText(distStr).width;
-            ctx.fillRect(midX - dW/2 - 2, midY - 6, dW + 4, 12);
+            ctx.fillRect(labelX - dW/2 - 2, labelY - 6, dW + 4, 12);
             ctx.restore();
             
-            ctx.fillText(distStr, midX, midY);
+            ctx.fillText(distStr, labelX, labelY);
             ctx.restore();
         });
     }
@@ -2875,8 +2968,6 @@ function getCombinedCanvasDataURL() {
     // 8. Dibujar Líneas de Cableado al Rack en Exportación
     if (appState.rack && appState.showCables) {
         appState.cameras.forEach(cam => {
-            const dx = cam.x - appState.rack.x;
-            const dy = cam.y - appState.rack.y;
             const distReal = calculateRealDistance(cam);
             
             ectx.save();
@@ -2884,15 +2975,78 @@ function getCombinedCanvasDataURL() {
             ectx.lineWidth = 1.5;
             ectx.setLineDash([6, 8]);
             
-            ectx.beginPath();
-            ectx.moveTo(appState.rack.x, appState.rack.y);
-            ectx.lineTo(cam.x, cam.y);
-            ectx.stroke();
+            let labelX = cam.x;
+            let labelY = cam.y;
+            
+            // Si hay cañerías trazadas, dibujar la ruta por la cañería en exportación
+            if (appState.conduits && appState.conduits.length > 0) {
+                let minTotalDist = Infinity;
+                let bestCond = null;
+                let bestRackProj = null;
+                let bestCamProj = null;
+                
+                appState.conduits.forEach(cond => {
+                    if (cond.points.length < 2) return;
+                    const rackProj = projectPointToPath(appState.rack, cond.points);
+                    const camProj = projectPointToPath(cam, cond.points);
+                    const distRackToCond = rackProj.distanceToPath;
+                    const distCamToCond = camProj.distanceToPath;
+                    const distAlongCond = pathDistanceBetweenProjections(cond.points, rackProj, camProj);
+                    const total2D = distRackToCond + distAlongCond + distCamToCond;
+                    
+                    if (total2D < minTotalDist) {
+                        minTotalDist = total2D;
+                        bestCond = cond;
+                        bestRackProj = rackProj;
+                        bestCamProj = camProj;
+                    }
+                });
+                
+                if (bestCond) {
+                    // 1. Tramo Rack -> Cañería
+                    ectx.beginPath();
+                    ectx.moveTo(appState.rack.x, appState.rack.y);
+                    ectx.lineTo(bestRackProj.point.x, bestRackProj.point.y);
+                    ectx.stroke();
+                    
+                    // 2. Tramo por la Cañería
+                    drawPathAlongConduit(ectx, bestCond.points, bestRackProj, bestCamProj);
+                    
+                    // 3. Tramo Cañería -> Cámara
+                    ectx.beginPath();
+                    ectx.moveTo(bestCamProj.point.x, bestCamProj.point.y);
+                    ectx.lineTo(cam.x, cam.y);
+                    ectx.stroke();
+                    
+                    // Colocar etiqueta en el tramo de bajada/conexión
+                    labelX = (bestCamProj.point.x + cam.x) / 2;
+                    labelY = (bestCamProj.point.y + cam.y) / 2;
+                    const dx = cam.x - bestCamProj.point.x;
+                    const dy = cam.y - bestCamProj.point.y;
+                    if (Math.sqrt(dx*dx + dy*dy) < 15) {
+                        labelX = cam.x;
+                        labelY = cam.y - 14;
+                    }
+                } else {
+                    // Fallback
+                    ectx.beginPath();
+                    ectx.moveTo(appState.rack.x, appState.rack.y);
+                    ectx.lineTo(cam.x, cam.y);
+                    ectx.stroke();
+                    labelX = (cam.x + appState.rack.x) / 2;
+                    labelY = (cam.y + appState.rack.y) / 2;
+                }
+            } else {
+                // Sin cañerías
+                ectx.beginPath();
+                ectx.moveTo(appState.rack.x, appState.rack.y);
+                ectx.lineTo(cam.x, cam.y);
+                ectx.stroke();
+                labelX = (cam.x + appState.rack.x) / 2;
+                labelY = (cam.y + appState.rack.y) / 2;
+            }
             
             // Dibujar los metros
-            const midX = (cam.x + appState.rack.x) / 2;
-            const midY = (cam.y + appState.rack.y) / 2;
-            
             ectx.fillStyle = '#06b6d4';
             ectx.font = 'bold 10px Outfit';
             ectx.textAlign = 'center';
@@ -2902,10 +3056,10 @@ function getCombinedCanvasDataURL() {
             ectx.fillStyle = 'rgba(9, 11, 17, 0.85)';
             const distStr = `${Math.round(distReal)}m`;
             const dW = ectx.measureText(distStr).width;
-            ectx.fillRect(midX - dW/2 - 2, midY - 6, dW + 4, 12);
+            ectx.fillRect(labelX - dW/2 - 2, labelY - 6, dW + 4, 12);
             ectx.restore();
             
-            ectx.fillText(distStr, midX, midY);
+            ectx.fillText(distStr, labelX, labelY);
             ectx.restore();
         });
     }
