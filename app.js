@@ -343,7 +343,12 @@ let appState = {
     isRotatingCamera: false,    // ¿Rotando con gizmo?
     rotatingCameraId: null,
     isPanning: false,           // ¿Moviendo el lienzo?
-    panStart: { x: 0, y: 0 }
+    panStart: { x: 0, y: 0 },
+    
+    // Rack y Tendido de Cables
+    rack: { x: 500, y: 350, name: 'Rack Central' },
+    showCables: true,
+    isDraggingRack: false
 };
 
 // 3. ELEMENTOS DEL DOM
@@ -421,6 +426,7 @@ const reportClientName = document.getElementById('reportClientName');
 const reportLaborBudget = document.getElementById('reportLaborBudget');
 const reportProjectDate = document.getElementById('reportProjectDate');
 const reportObservations = document.getElementById('reportObservations');
+const chkShowCables = document.getElementById('chkShowCables');
 
 // 4. INICIALIZACIÓN
 window.addEventListener('DOMContentLoaded', () => {
@@ -510,6 +516,13 @@ function setupEventListeners() {
     btnDrawDimension.addEventListener('click', toggleDrawDimensionMode);
     btnSaveDimension.addEventListener('click', saveDimensionLabel);
     btnCancelDimension.addEventListener('click', cancelDimensionLine);
+    
+    // Checkbox Tendido Cables
+    chkShowCables.addEventListener('change', e => {
+        appState.showCables = e.target.checked;
+        saveStateToLocalStorage();
+        draw();
+    });
     
     // Botones de Guardar / Cargar Proyectos (JSON) e Impresión
     btnExportProject.addEventListener('click', exportProjectJSON);
@@ -1175,6 +1188,11 @@ function renderActiveCamerasList() {
             draw();
         });
         
+        // Calcular distancia al rack
+        const dx = cam.x - (appState.rack ? appState.rack.x : 500);
+        const dy = cam.y - (appState.rack ? appState.rack.y : 350);
+        const distToRack = pixelsToMeters(Math.sqrt(dx*dx + dy*dy));
+        
         card.innerHTML = `
             <div class="cam-card-header">
                 <div class="cam-card-title-group">
@@ -1189,8 +1207,9 @@ function renderActiveCamerasList() {
                 </div>
             </div>
             <div class="cam-card-body">
-                <div style="color: var(--text-muted); font-size: 10px; margin-bottom: 2px;">
-                    ${cam.model} (${cam.lens})
+                <div style="color: var(--text-muted); font-size: 10px; margin-bottom: 2px; display: flex; justify-content: space-between;">
+                    <span>${cam.model} (${cam.lens})</span>
+                    <span style="color: var(--color-primary); font-weight: bold; font-family: monospace; font-size: 11px;">Cable: ${Math.round(distToRack)}m</span>
                 </div>
                 <div class="cam-card-controls">
                     <!-- Rotación -->
@@ -1454,6 +1473,22 @@ function handleMouseDown(e) {
             }
         }
         
+        // ¿Hizo click sobre el Rack? (Para arrastrarlo)
+        if (appState.rack) {
+            const dx = worldCoords.x - appState.rack.x;
+            const dy = worldCoords.y - appState.rack.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < 28 / appState.zoomScale) {
+                appState.isDraggingRack = true;
+                appState.dragOffset = {
+                    x: worldCoords.x - appState.rack.x,
+                    y: worldCoords.y - appState.rack.y
+                };
+                canvas.style.cursor = 'grabbing';
+                return;
+            }
+        }
+
         // ¿Hizo click sobre alguna cámara (para seleccionarla / arrastrarla)?
         // Evaluamos de la última a la primera (las de arriba primero)
         for (let i = appState.cameras.length - 1; i >= 0; i--) {
@@ -1550,6 +1585,14 @@ function handleMouseMove(e) {
         return;
     }
     
+    // 3b. Arrastrando Rack
+    if (appState.isDraggingRack && appState.rack) {
+        appState.rack.x = worldCoords.x - (appState.dragOffset ? appState.dragOffset.x : 0);
+        appState.rack.y = worldCoords.y - (appState.dragOffset ? appState.dragOffset.y : 0);
+        draw();
+        return;
+    }
+    
     // 4. Actualizar cursor sobre elementos activos
     if (!appState.isCalibrating && appState.backgroundImage) {
         let hover = false;
@@ -1585,6 +1628,16 @@ function handleMouseMove(e) {
             }
         }
         
+        // Hover en Rack
+        if (!hover && appState.rack) {
+            const dx = worldCoords.x - appState.rack.x;
+            const dy = worldCoords.y - appState.rack.y;
+            if (Math.sqrt(dx*dx + dy*dy) < 28 / appState.zoomScale) {
+                canvas.style.cursor = 'move';
+                hover = true;
+            }
+        }
+        
         if (!hover) {
             canvas.style.cursor = 'grab';
         }
@@ -1610,6 +1663,13 @@ function handleMouseUp(e) {
         canvas.style.cursor = 'grab';
         saveStateToLocalStorage();
     }
+    
+    if (appState.isDraggingRack) {
+        appState.isDraggingRack = false;
+        canvas.style.cursor = 'grab';
+        saveStateToLocalStorage();
+        renderActiveCamerasList();
+    }
 }
 
 // 14. EXPORTAR EL DISEÑO COMBINADO
@@ -1632,7 +1692,9 @@ function saveStateToLocalStorage() {
         totalWidth: appState.totalWidth,
         totalLength: appState.totalLength,
         totalHeight: appState.totalHeight,
-        measurements: appState.measurements
+        measurements: appState.measurements,
+        rack: appState.rack,
+        showCables: appState.showCables
     };
     localStorage.setItem('camPlanner_workspaceState', JSON.stringify(dataToSave));
 }
@@ -1642,7 +1704,6 @@ function loadStateFromLocalStorage() {
     if (saved) {
         try {
             const data = JSON.parse(saved);
-            // Si el nombre de la imagen guardada coincide con la cargada
             if (data.imageName === appState.imageName) {
                 appState.cameras = data.cameras || [];
                 appState.pixelsPerMeter = data.pixelsPerMeter || 10.0;
@@ -1651,6 +1712,12 @@ function loadStateFromLocalStorage() {
                 appState.totalLength = data.totalLength || 75;
                 appState.totalHeight = data.totalHeight || 6;
                 appState.measurements = data.measurements || [];
+                appState.rack = data.rack || { x: 500, y: 350, name: 'Rack Central' };
+                appState.showCables = data.showCables !== undefined ? data.showCables : true;
+                
+                if (chkShowCables) {
+                    chkShowCables.checked = appState.showCables;
+                }
                 
                 calibTotalWidth.value = appState.totalWidth;
                 calibTotalLength.value = appState.totalLength;
@@ -1919,6 +1986,87 @@ function draw() {
     // 7. Dibujar Cota Temporal si se está trazando
     if (appState.isDrawingDimension && appState.dimensionPoints.length === 1 && appState.currentMouseWorldCoords) {
         drawDimensionLine(ctx, appState.dimensionPoints[0], appState.currentMouseWorldCoords, 'Nueva Medida...', '#00d2ff', 1.5 / appState.zoomScale);
+    }
+    
+    // 8. Dibujar Líneas de Cableado al Rack
+    if (appState.rack && appState.showCables) {
+        appState.cameras.forEach(cam => {
+            const dx = cam.x - appState.rack.x;
+            const dy = cam.y - appState.rack.y;
+            const pixelDist = Math.sqrt(dx*dx + dy*dy);
+            const metersDist = pixelsToMeters(pixelDist);
+            
+            ctx.save();
+            ctx.strokeStyle = 'rgba(6, 182, 212, 0.45)'; // Cyan translúcido
+            ctx.lineWidth = 1 / appState.zoomScale;
+            ctx.setLineDash([4 / appState.zoomScale, 5 / appState.zoomScale]);
+            
+            ctx.beginPath();
+            ctx.moveTo(appState.rack.x, appState.rack.y);
+            ctx.lineTo(cam.x, cam.y);
+            ctx.stroke();
+            
+            // Dibujar los metros de cable en el punto medio de la línea
+            const midX = (cam.x + appState.rack.x) / 2;
+            const midY = (cam.y + appState.rack.y) / 2;
+            
+            ctx.fillStyle = '#22d3ee';
+            ctx.font = `bold ${Math.max(8, 9 / appState.zoomScale)}px Outfit`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            ctx.save();
+            ctx.fillStyle = 'rgba(9, 11, 17, 0.85)';
+            const distStr = `${Math.round(metersDist)}m`;
+            const dW = ctx.measureText(distStr).width;
+            ctx.fillRect(midX - dW/2 - 2, midY - 6, dW + 4, 12);
+            ctx.restore();
+            
+            ctx.fillText(distStr, midX, midY);
+            ctx.restore();
+        });
+    }
+
+    // 9. Dibujar Gabinete del Rack
+    if (appState.rack) {
+        ctx.save();
+        ctx.translate(appState.rack.x, appState.rack.y);
+        
+        ctx.fillStyle = '#06b6d4';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2 / appState.zoomScale;
+        
+        const rSize = 12 / appState.zoomScale;
+        // Gabinete
+        ctx.fillRect(-rSize, -rSize, rSize * 2, rSize * 2);
+        ctx.strokeRect(-rSize, -rSize, rSize * 2, rSize * 2);
+        
+        // Estantes del gabinete
+        ctx.strokeStyle = '#090b11';
+        ctx.lineWidth = 1.5 / appState.zoomScale;
+        ctx.beginPath();
+        ctx.moveTo(-rSize + 4 / appState.zoomScale, -rSize / 2);
+        ctx.lineTo(rSize - 4 / appState.zoomScale, -rSize / 2);
+        ctx.moveTo(-rSize + 4 / appState.zoomScale, 0);
+        ctx.lineTo(rSize - 4 / appState.zoomScale, 0);
+        ctx.moveTo(-rSize + 4 / appState.zoomScale, rSize / 2);
+        ctx.lineTo(rSize - 4 / appState.zoomScale, rSize / 2);
+        ctx.stroke();
+        
+        // Etiqueta del Rack
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${Math.max(10, 11 / appState.zoomScale)}px Outfit`;
+        ctx.textAlign = 'center';
+        
+        ctx.save();
+        ctx.fillStyle = 'rgba(6, 182, 212, 0.85)';
+        const rName = appState.rack.name || 'Rack Central';
+        const rNameW = ctx.measureText(rName).width;
+        ctx.fillRect(-rNameW/2 - 4, -rSize - 18, rNameW + 8, 14);
+        ctx.restore();
+        
+        ctx.fillText(rName, 0, -rSize - 8);
+        ctx.restore();
     }
     
     ctx.restore();
@@ -2310,6 +2458,87 @@ function getCombinedCanvasDataURL() {
         });
     }
     
+    // 8. Dibujar Líneas de Cableado al Rack en Exportación
+    if (appState.rack && appState.showCables) {
+        appState.cameras.forEach(cam => {
+            const dx = cam.x - appState.rack.x;
+            const dy = cam.y - appState.rack.y;
+            const pixelDist = Math.sqrt(dx*dx + dy*dy);
+            const metersDist = pixelsToMeters(pixelDist);
+            
+            ectx.save();
+            ectx.strokeStyle = 'rgba(6, 182, 212, 0.5)';
+            ectx.lineWidth = 1.5;
+            ectx.setLineDash([6, 8]);
+            
+            ectx.beginPath();
+            ectx.moveTo(appState.rack.x, appState.rack.y);
+            ectx.lineTo(cam.x, cam.y);
+            ectx.stroke();
+            
+            // Dibujar los metros
+            const midX = (cam.x + appState.rack.x) / 2;
+            const midY = (cam.y + appState.rack.y) / 2;
+            
+            ectx.fillStyle = '#06b6d4';
+            ectx.font = 'bold 10px Outfit';
+            ectx.textAlign = 'center';
+            ectx.textBaseline = 'middle';
+            
+            ectx.save();
+            ectx.fillStyle = 'rgba(9, 11, 17, 0.85)';
+            const distStr = `${Math.round(metersDist)}m`;
+            const dW = ectx.measureText(distStr).width;
+            ectx.fillRect(midX - dW/2 - 2, midY - 6, dW + 4, 12);
+            ectx.restore();
+            
+            ectx.fillText(distStr, midX, midY);
+            ectx.restore();
+        });
+    }
+
+    // 9. Dibujar Gabinete del Rack en Exportación
+    if (appState.rack) {
+        ectx.save();
+        ectx.translate(appState.rack.x, appState.rack.y);
+        
+        ectx.fillStyle = '#06b6d4';
+        ectx.strokeStyle = '#ffffff';
+        ectx.lineWidth = 3;
+        
+        const rSize = 14;
+        // Gabinete
+        ectx.fillRect(-rSize, -rSize, rSize * 2, rSize * 2);
+        ectx.strokeRect(-rSize, -rSize, rSize * 2, rSize * 2);
+        
+        // Estantes
+        ectx.strokeStyle = '#090b11';
+        ectx.lineWidth = 2;
+        ectx.beginPath();
+        ectx.moveTo(-rSize + 4, -rSize / 2);
+        ectx.lineTo(rSize - 4, -rSize / 2);
+        ectx.moveTo(-rSize + 4, 0);
+        ectx.lineTo(rSize - 4, 0);
+        ectx.moveTo(-rSize + 4, rSize / 2);
+        ectx.lineTo(rSize - 4, rSize / 2);
+        ectx.stroke();
+        
+        // Etiqueta
+        ectx.fillStyle = '#ffffff';
+        ectx.font = 'bold 12px Outfit';
+        ectx.textAlign = 'center';
+        
+        ectx.save();
+        ectx.fillStyle = 'rgba(6, 182, 212, 0.85)';
+        const rName = appState.rack.name || 'Rack Central';
+        const rNameW = ectx.measureText(rName).width;
+        ectx.fillRect(-rNameW/2 - 4, -rSize - 18, rNameW + 8, 14);
+        ectx.restore();
+        
+        ectx.fillText(rName, 0, -rSize - 8);
+        ectx.restore();
+    }
+    
     return exportCanvas.toDataURL('image/png');
 }
 
@@ -2334,9 +2563,20 @@ function printTechnicalReport() {
         try {
             const mapDataUrl = getCombinedCanvasDataURL();
             
-            // Filas de cámaras
+            // Filas de cámaras y cálculo de cables
             let camerasRows = '';
+            let totalCableMeters = 0;
             appState.cameras.forEach((cam, idx) => {
+                const dx = cam.x - (appState.rack ? appState.rack.x : 500);
+                const dy = cam.y - (appState.rack ? appState.rack.y : 350);
+                const distToRack = pixelsToMeters(Math.sqrt(dx*dx + dy*dy));
+                totalCableMeters += distToRack;
+                
+                const isTooFar = distToRack > 90 && cam.fov < 360;
+                const distStr = isTooFar 
+                    ? `<strong style="color: #dc2626;">${Math.round(distToRack)} m ⚠️</strong>`
+                    : `${Math.round(distToRack)} m`;
+                
                 camerasRows += `
                     <tr>
                         <td style="text-align:center;"><strong>${idx + 1}</strong></td>
@@ -2347,13 +2587,14 @@ function printTechnicalReport() {
                         <td style="text-align:center;">${cam.height || 3} m</td>
                         <td style="text-align:center;">${Math.round(cam.fov)}°</td>
                         <td style="text-align:center;">${Math.round(cam.range)} m</td>
+                        <td style="text-align:center; font-family: monospace; font-weight: 500;">${distStr}</td>
                         <td><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${cam.color}; margin-right:6px; vertical-align:middle;"></span>${cam.color}</td>
                     </tr>
                 `;
             });
             
             if (appState.cameras.length === 0) {
-                camerasRows = `<tr><td colspan="9" style="text-align:center; color: #555;">No hay cámaras instaladas en el plano.</td></tr>`;
+                camerasRows = `<tr><td colspan="10" style="text-align:center; color: #555;">No hay cámaras instaladas en el plano.</td></tr>`;
             }
             
             // Filas de cotas (medidas)
@@ -2444,6 +2685,7 @@ function printTechnicalReport() {
                             <th style="text-align:center;">Alt. Montaje</th>
                             <th style="text-align:center;">Ángulo (FOV)</th>
                             <th style="text-align:center;">Rango IR</th>
+                            <th style="text-align:center;">Dist. Rack</th>
                             <th>Color Haz</th>
                         </tr>
                     </thead>
@@ -2451,6 +2693,13 @@ function printTechnicalReport() {
                         ${camerasRows}
                     </tbody>
                 </table>
+                
+                ${appState.cameras.length > 0 ? `
+                <div style="font-size: 10px; margin-top: 8px; color: #555; display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed #ccc; padding-top: 8px; margin-bottom: 20px;">
+                    <span>* Las distancias al Rack son estimaciones lineales. Se recomienda agregar un 10% a 15% de margen por curvas.</span>
+                    <span style="font-size: 12px; font-weight: bold; color: #0b0f19;">Total Cable UTP Estimado: ${Math.round(totalCableMeters * 1.15)} metros <span style="font-size: 10px; font-weight: normal; color: #555;">(con 15% de holgura)</span></span>
+                </div>
+                ` : ''}
                 
                 ${appState.measurements.length > 0 ? `
                 <div class="print-section-title">4. Medidas de Referencia del Terreno (Cotas)</div>
