@@ -268,6 +268,43 @@ const CAMERA_PRESETS = [
         range: 30,
         lens: '3.6mm',
         color: '#8b5cf6'
+    },
+    // --- REDES MESH WI-FI ---
+    {
+        brand: 'mesh',
+        brandName: 'Red Mesh Wi-Fi',
+        model: 'Ubiquiti UniFi AC-Mesh (UAP-AC-M)',
+        fov: 360,
+        range: 120,
+        lens: 'Omnidireccional Exterior',
+        color: '#06b6d4'
+    },
+    {
+        brand: 'mesh',
+        brandName: 'Red Mesh Wi-Fi',
+        model: 'Ubiquiti UniFi U6-Mesh (Wi-Fi 6)',
+        fov: 360,
+        range: 100,
+        lens: 'MIMO 2x2 Ext/Int',
+        color: '#22d3ee'
+    },
+    {
+        brand: 'mesh',
+        brandName: 'Red Mesh Wi-Fi',
+        model: 'TP-Link Omada EAP610-Outdoor',
+        fov: 360,
+        range: 150,
+        lens: 'Wi-Fi 6 IP67',
+        color: '#0891b2'
+    },
+    {
+        brand: 'mesh',
+        brandName: 'Red Mesh Wi-Fi',
+        model: 'TP-Link Omada EAP225-Outdoor',
+        fov: 360,
+        range: 90,
+        lens: 'Wi-Fi 5 IP65',
+        color: '#0e7490'
     }
 ];
 
@@ -1685,13 +1722,15 @@ function draw() {
         ctx.lineWidth = 1.5 / appState.zoomScale; // Líneas finas en pantalla
         ctx.stroke();
         
-        // Línea central del haz (dirección hacia la que apunta)
-        ctx.beginPath();
-        ctx.setLineDash([5 / appState.zoomScale, 5 / appState.zoomScale]);
-        ctx.moveTo(cam.x, cam.y);
-        ctx.lineTo(cam.x + Math.cos(rotRad) * radius, cam.y + Math.sin(rotRad) * radius);
-        ctx.stroke();
-        ctx.setLineDash([]); // Reset
+        // Línea central del haz (dirección hacia la que apunta) - Solo para cámaras direccionales
+        if (cam.fov < 360) {
+            ctx.beginPath();
+            ctx.setLineDash([5 / appState.zoomScale, 5 / appState.zoomScale]);
+            ctx.moveTo(cam.x, cam.y);
+            ctx.lineTo(cam.x + Math.cos(rotRad) * radius, cam.y + Math.sin(rotRad) * radius);
+            ctx.stroke();
+            ctx.setLineDash([]); // Reset
+        }
         
         // Texto con el alcance en metros al final
         ctx.fillStyle = '#ffffff';
@@ -1737,15 +1776,40 @@ function draw() {
         ctx.fill();
         ctx.stroke();
         
-        // Lente (trapezoide apuntando al frente)
-        ctx.beginPath();
-        ctx.moveTo(iconRadius * 0.8, -iconRadius * 0.5);
-        ctx.lineTo(iconRadius * 1.6, -iconRadius * 0.9);
-        ctx.lineTo(iconRadius * 1.6, iconRadius * 0.9);
-        ctx.lineTo(iconRadius * 0.8, iconRadius * 0.5);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
+        // Lente (trapezoide apuntando al frente) o Símbolo de Access Point Wi-Fi
+        if (cam.fov < 360) {
+            ctx.beginPath();
+            ctx.moveTo(iconRadius * 0.8, -iconRadius * 0.5);
+            ctx.lineTo(iconRadius * 1.6, -iconRadius * 0.9);
+            ctx.lineTo(iconRadius * 1.6, iconRadius * 0.9);
+            ctx.lineTo(iconRadius * 0.8, iconRadius * 0.5);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        } else {
+            // Dibujar ondas Wi-Fi (Símbolo de AP)
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5 / appState.zoomScale;
+            
+            // Onda interna
+            ctx.beginPath();
+            ctx.arc(0, 0, iconRadius * 1.4, -Math.PI / 4 - Math.PI / 2, Math.PI / 4 - Math.PI / 2);
+            ctx.stroke();
+            
+            // Onda externa
+            ctx.beginPath();
+            ctx.arc(0, 0, iconRadius * 1.9, -Math.PI / 4 - Math.PI / 2, Math.PI / 4 - Math.PI / 2);
+            ctx.stroke();
+            
+            // Escribir "AP" en el centro
+            ctx.rotate(-rotRad); // Escribir derecho
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${Math.max(6, 6 / appState.zoomScale)}px Outfit`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('AP', 0, 0.5 / appState.zoomScale);
+            ctx.rotate(rotRad);
+        }
         
         // Nombre encima de la cámara (Volver a rotación 0 para escribir derecho)
         ctx.rotate(-rotRad);
