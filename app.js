@@ -2285,21 +2285,21 @@ function draw() {
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 2 / appState.zoomScale;
         
-        const rSize = 12 / appState.zoomScale;
+        const rSize = 8 / appState.zoomScale;
         // Gabinete
         ctx.fillRect(-rSize, -rSize, rSize * 2, rSize * 2);
         ctx.strokeRect(-rSize, -rSize, rSize * 2, rSize * 2);
         
         // Estantes del gabinete
         ctx.strokeStyle = '#090b11';
-        ctx.lineWidth = 1.5 / appState.zoomScale;
+        ctx.lineWidth = 1 / appState.zoomScale;
         ctx.beginPath();
-        ctx.moveTo(-rSize + 4 / appState.zoomScale, -rSize / 2);
-        ctx.lineTo(rSize - 4 / appState.zoomScale, -rSize / 2);
-        ctx.moveTo(-rSize + 4 / appState.zoomScale, 0);
-        ctx.lineTo(rSize - 4 / appState.zoomScale, 0);
-        ctx.moveTo(-rSize + 4 / appState.zoomScale, rSize / 2);
-        ctx.lineTo(rSize - 4 / appState.zoomScale, rSize / 2);
+        ctx.moveTo(-rSize + 2 / appState.zoomScale, -rSize / 2);
+        ctx.lineTo(rSize - 2 / appState.zoomScale, -rSize / 2);
+        ctx.moveTo(-rSize + 2 / appState.zoomScale, 0);
+        ctx.lineTo(rSize - 2 / appState.zoomScale, 0);
+        ctx.moveTo(-rSize + 2 / appState.zoomScale, rSize / 2);
+        ctx.lineTo(rSize - 2 / appState.zoomScale, rSize / 2);
         ctx.stroke();
         
         // Etiqueta del Rack
@@ -2919,21 +2919,21 @@ function getCombinedCanvasDataURL() {
         ectx.strokeStyle = '#ffffff';
         ectx.lineWidth = 3;
         
-        const rSize = 14;
+        const rSize = 9;
         // Gabinete
         ectx.fillRect(-rSize, -rSize, rSize * 2, rSize * 2);
         ectx.strokeRect(-rSize, -rSize, rSize * 2, rSize * 2);
         
         // Estantes
         ectx.strokeStyle = '#090b11';
-        ectx.lineWidth = 2;
+        ectx.lineWidth = 1.5;
         ectx.beginPath();
-        ectx.moveTo(-rSize + 4, -rSize / 2);
-        ectx.lineTo(rSize - 4, -rSize / 2);
-        ectx.moveTo(-rSize + 4, 0);
-        ectx.lineTo(rSize - 4, 0);
-        ectx.moveTo(-rSize + 4, rSize / 2);
-        ectx.lineTo(rSize - 4, rSize / 2);
+        ectx.moveTo(-rSize + 2, -rSize / 2);
+        ectx.lineTo(rSize - 2, -rSize / 2);
+        ectx.moveTo(-rSize + 2, 0);
+        ectx.lineTo(rSize - 2, 0);
+        ectx.moveTo(-rSize + 2, rSize / 2);
+        ectx.lineTo(rSize - 2, rSize / 2);
         ectx.stroke();
         
         // Etiqueta
