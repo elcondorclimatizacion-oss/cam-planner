@@ -1209,7 +1209,7 @@ function renderActiveCamerasList() {
             <div class="cam-card-body">
                 <div style="color: var(--text-muted); font-size: 10px; margin-bottom: 2px; display: flex; justify-content: space-between;">
                     <span>${cam.model} (${cam.lens})</span>
-                    <span style="color: var(--color-primary); font-weight: bold; font-family: monospace; font-size: 11px;">Cable: ${Math.round(distToRack)}m</span>
+                    <span style="color: var(--color-primary); font-weight: bold; font-family: monospace; font-size: 11px;">Distancia: ${Math.round(distToRack)}m</span>
                 </div>
                 <div class="cam-card-controls">
                     <!-- Rotación -->
@@ -2563,19 +2563,12 @@ function printTechnicalReport() {
         try {
             const mapDataUrl = getCombinedCanvasDataURL();
             
-            // Filas de cámaras y cálculo de cables
+            // Filas de cámaras y cálculo de distancia al rack
             let camerasRows = '';
-            let totalCableMeters = 0;
             appState.cameras.forEach((cam, idx) => {
                 const dx = cam.x - (appState.rack ? appState.rack.x : 500);
                 const dy = cam.y - (appState.rack ? appState.rack.y : 350);
                 const distToRack = pixelsToMeters(Math.sqrt(dx*dx + dy*dy));
-                totalCableMeters += distToRack;
-                
-                const isTooFar = distToRack > 90 && cam.fov < 360;
-                const distStr = isTooFar 
-                    ? `<strong style="color: #dc2626;">${Math.round(distToRack)} m ⚠️</strong>`
-                    : `${Math.round(distToRack)} m`;
                 
                 camerasRows += `
                     <tr>
@@ -2587,7 +2580,7 @@ function printTechnicalReport() {
                         <td style="text-align:center;">${cam.height || 3} m</td>
                         <td style="text-align:center;">${Math.round(cam.fov)}°</td>
                         <td style="text-align:center;">${Math.round(cam.range)} m</td>
-                        <td style="text-align:center; font-family: monospace; font-weight: 500;">${distStr}</td>
+                        <td style="text-align:center; font-family: monospace; font-weight: 500;">${Math.round(distToRack)} m</td>
                         <td><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${cam.color}; margin-right:6px; vertical-align:middle;"></span>${cam.color}</td>
                     </tr>
                 `;
@@ -2695,9 +2688,8 @@ function printTechnicalReport() {
                 </table>
                 
                 ${appState.cameras.length > 0 ? `
-                <div style="font-size: 10px; margin-top: 8px; color: #555; display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed #ccc; padding-top: 8px; margin-bottom: 20px;">
-                    <span>* Las distancias al Rack son estimaciones lineales. Se recomienda agregar un 10% a 15% de margen por curvas.</span>
-                    <span style="font-size: 12px; font-weight: bold; color: #0b0f19;">Total Cable UTP Estimado: ${Math.round(totalCableMeters * 1.15)} metros <span style="font-size: 10px; font-weight: normal; color: #555;">(con 15% de holgura)</span></span>
+                <div style="font-size: 10px; margin-top: 8px; color: #555; border-top: 1px dashed #ccc; padding-top: 8px; margin-bottom: 20px;">
+                    <span>* Las distancias indicadas representan la distancia lineal directa en el plano desde el Rack Central hasta la cámara.</span>
                 </div>
                 ` : ''}
                 
