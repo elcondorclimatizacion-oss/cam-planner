@@ -1811,20 +1811,25 @@ function draw() {
             ctx.rotate(rotRad);
         }
         
-        // Nombre encima de la cámara (Volver a rotación 0 para escribir derecho)
+        // Nombre encima de la cámara con metros (Volver a rotación 0 para escribir derecho)
         ctx.rotate(-rotRad);
+        const labelStr = cam.fov === 360 
+            ? `${cam.name} (R: ${Math.round(cam.range)}m)` 
+            : `${cam.name} (H: ${cam.height || 3}m, R: ${Math.round(cam.range)}m)`;
+            
         ctx.fillStyle = isSelected ? '#ffffff' : '#94a3b8';
         ctx.font = `bold ${Math.max(10, 11 / appState.zoomScale)}px Outfit`;
         ctx.textAlign = 'center';
-        // Dibujar fondo oscuro
+        
+        // Dibujar fondo oscuro adaptado al ancho del nuevo texto
         ctx.save();
-        ctx.fillStyle = 'rgba(9, 11, 17, 0.7)';
-        const nameW = ctx.measureText(cam.name).width;
+        ctx.fillStyle = 'rgba(9, 11, 17, 0.75)';
+        const nameW = ctx.measureText(labelStr).width;
         ctx.fillRect(-nameW/2 - 4, -iconRadius - 18, nameW + 8, 14);
         ctx.restore();
         
         ctx.fillStyle = isSelected ? '#ffffff' : '#e2e8f0';
-        ctx.fillText(cam.name, 0, -iconRadius - 8);
+        ctx.fillText(labelStr, 0, -iconRadius - 8);
         ctx.restore();
         
         // 4. Dibujar manejador (Gizmo) de rotación si está seleccionada
@@ -2270,12 +2275,16 @@ function getCombinedCanvasDataURL() {
         ectx.lineWidth = 2;
         
         ectx.rotate(-rotRad);
+        const labelStr = cam.fov === 360 
+            ? `${cam.name} (R: ${Math.round(cam.range)}m)` 
+            : `${cam.name} (H: ${cam.height || 3}m, R: ${Math.round(cam.range)}m)`;
+            
         ectx.fillStyle = '#ffffff';
         ectx.shadowColor = 'rgba(0,0,0,0.8)';
         ectx.shadowBlur = 4;
-        ectx.font = '12px Outfit';
+        ectx.font = 'bold 12px Outfit';
         ectx.textAlign = 'center';
-        ectx.fillText(cam.name, 0, -20);
+        ectx.fillText(labelStr, 0, -20);
         ectx.rotate(rotRad);
         
         ectx.beginPath();
