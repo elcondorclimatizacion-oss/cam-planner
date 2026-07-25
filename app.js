@@ -1362,10 +1362,20 @@ function handleMouseDown(e) {
             appState.dimensionPoints.push({ x: worldCoords.x, y: worldCoords.y });
         } else if (appState.dimensionPoints.length === 1) {
             appState.dimensionPoints.push({ x: worldCoords.x, y: worldCoords.y });
-            // Mostrar modal de ingreso de texto de cota
+            
+            // Calcular distancia matemática basada en la escala actual
+            const p1 = appState.dimensionPoints[0];
+            const p2 = appState.dimensionPoints[1];
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const pixelDist = Math.sqrt(dx*dx + dy*dy);
+            const metersDist = pixelsToMeters(pixelDist);
+            
+            // Mostrar modal de ingreso de texto de cota con la medida matemática pre-cargada
             dimensionModal.classList.add('active');
-            dimLabelInput.value = '';
+            dimLabelInput.value = `${Math.round(metersDist)}m`;
             dimLabelInput.focus();
+            dimLabelInput.select(); // Selecciona el texto para que el usuario pueda sobrescribirlo si quiere
         }
         draw();
         return;
