@@ -350,7 +350,12 @@ let appState = {
     showCables: true,
     isDraggingRack: false,
     rackHeight: 1.6,
-    conduitHeight: 6.0
+    conduitHeight: 6.0,
+    
+    // Cañerías
+    conduits: [],
+    isDrawingConduit: false,
+    conduitPoints: []
 };
 
 // 3. ELEMENTOS DEL DOM
@@ -431,6 +436,9 @@ const reportObservations = document.getElementById('reportObservations');
 const chkShowCables = document.getElementById('chkShowCables');
 const rackHeightInput = document.getElementById('rackHeight');
 const conduitHeightInput = document.getElementById('conduitHeight');
+const btnDrawConduit = document.getElementById('btnDrawConduit');
+const activeConduitsList = document.getElementById('activeConduitsList');
+const activeConduitsCount = document.getElementById('activeConduitsCount');
 
 // 4. INICIALIZACIÓN
 window.addEventListener('DOMContentLoaded', () => {
@@ -520,6 +528,9 @@ function setupEventListeners() {
     btnDrawDimension.addEventListener('click', toggleDrawDimensionMode);
     btnSaveDimension.addEventListener('click', saveDimensionLabel);
     btnCancelDimension.addEventListener('click', cancelDimensionLine);
+    
+    // Botón de Cañería
+    btnDrawConduit.addEventListener('click', toggleDrawConduitMode);
     
     // Checkbox Tendido Cables
     chkShowCables.addEventListener('change', e => {
@@ -682,6 +693,10 @@ function handleImageUpload(e) {
             appState.calibrated = false;
             appState.calibPoints = [];
             appState.pixelsPerMeter = 10.0; // Reset a default
+            appState.conduits = [];
+            appState.measurements = [];
+            renderConduitsList();
+            renderCotasList();
             updateLengthFromWidth();
             updateScaleUI();
             resetZoomAndPan();
@@ -971,6 +986,12 @@ function toggleCalibrationMode() {
     appState.calibPoints = [];
     
     if (appState.isCalibrating) {
+        // Desactivar otros modos
+        appState.isDrawingDimension = false;
+        btnDrawDimension.classList.remove('active');
+        appState.isDrawingConduit = false;
+        btnDrawConduit.classList.remove('active');
+        
         btnCalibrate.classList.add('active');
         btnStartCalibrate.classList.add('btn-primary');
         btnStartCalibrate.textContent = 'Calibrando (Haz clic en mapa)...';
@@ -1120,6 +1141,11 @@ function addCameraToCenter() {
 }
 
 function handleDoubleClick(e) {
+    if (appState.isDrawingConduit) {
+        saveConduitLine();
+        return;
+    }
+    
     if (appState.isCalibrating || !appState.backgroundImage) return;
     
     const m = getSelectedModelDetails();
@@ -1181,12 +1207,134 @@ function clearAllCameras() {
     }
 }
 
+// Proyectar punto P al segmento AB
+function projectPointToSegment(P, A, B) {
+    const abX = B.x - A.x;
+    const abY = B.y - A.y;
+    const apX = P.x - A.x;
+    const apY = P.y - A.y;
+    
+    const abLenSq = abX * abX + abY * abY;
+    if (abLenSq === 0) return { x: A.x, y: A.y, t: 0 };
+    
+    let t = (apX * abX + apY * abY) / abLenSq;
+    t = Math.max(0, Math.min(1, t)); // Limitar al segmento
+    
+    return {
+        x: A.x + t * abX,
+        y: A.y + t * abY,
+        t: t
+    };
+}
+
+// Proyectar punto P a una línea string (cañería)
+function projectPointToPath(P, points) {
+    let minD = Infinity;
+    let bestProj = null;
+    let bestSegmentIndex = -1;
+    
+    for (let i = 0; i < points.length - 1; i++) {
+        const A = points[i];
+        const B = points[i+1];
+        const proj = projectPointToSegment(P, A, B);
+        const dx = P.x - proj.x;
+        const dy = P.y - proj.y;
+        const d = Math.sqrt(dx*dx + dy*dy);
+        
+        if (d < minD) {
+            minD = d;
+            bestProj = proj;
+            bestSegmentIndex = i;
+        }
+    }
+    
+    return {
+        point: bestProj, // {x, y}
+        segmentIndex: bestSegmentIndex,
+        distanceToPath: minD
+    };
+}
+
+// Distancia en píxeles a lo largo de los segmentos de la cañería
+function pathDistanceBetweenProjections(points, proj1, proj2) {
+    let idx1 = proj1.segmentIndex;
+    let idx2 = proj2.segmentIndex;
+    let p1 = proj1.point;
+    let p2 = proj2.point;
+    
+    if (idx1 === idx2) {
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        return Math.sqrt(dx*dx + dy*dy);
+    }
+    
+    if (idx1 > idx2) {
+        let temp = idx1; idx1 = idx2; idx2 = temp;
+        let tempP = p1; p1 = p2; p2 = tempP;
+    }
+    
+    let totalD = 0;
+    
+    // De p1 al final del segmento idx1
+    const endSegment1 = points[idx1 + 1];
+    let dx = endSegment1.x - p1.x;
+    let dy = endSegment1.y - p1.y;
+    totalD += Math.sqrt(dx*dx + dy*dy);
+    
+    // Segmentos intermedios completos
+    for (let i = idx1 + 1; i < idx2; i++) {
+        const A = points[i];
+        const B = points[i+1];
+        const segDx = B.x - A.x;
+        const segDy = B.y - A.y;
+        totalD += Math.sqrt(segDx*segDx + segDy*segDy);
+    }
+    
+    // Del inicio del segmento idx2 a p2
+    const startSegment2 = points[idx2];
+    dx = p2.x - startSegment2.x;
+    dy = p2.y - startSegment2.y;
+    totalD += Math.sqrt(dx*dx + dy*dy);
+    
+    return totalD;
+}
+
 // Función para calcular la distancia real 3D (Opción B)
 function calculateRealDistance(cam) {
     if (!appState.rack) return 0;
-    const dx = cam.x - appState.rack.x;
-    const dy = cam.y - appState.rack.y;
-    const dist2D = pixelsToMeters(Math.sqrt(dx*dx + dy*dy));
+    
+    let dist2D = 0;
+    
+    // Si hay cañerías trazadas, calcular la distancia recorriendo la cañería
+    if (appState.conduits && appState.conduits.length > 0) {
+        let minTotalDist = Infinity;
+        
+        appState.conduits.forEach(cond => {
+            if (cond.points.length < 2) return;
+            
+            // Proyectar Rack a la cañería
+            const rackProj = projectPointToPath(appState.rack, cond.points);
+            // Proyectar Cámara a la cañería
+            const camProj = projectPointToPath(cam, cond.points);
+            
+            // Calcular distancias de conexión
+            const distRackToCond = rackProj.distanceToPath;
+            const distCamToCond = camProj.distanceToPath;
+            const distAlongCond = pathDistanceBetweenProjections(cond.points, rackProj, camProj);
+            
+            const total2D = distRackToCond + distAlongCond + distCamToCond;
+            if (total2D < minTotalDist) {
+                minTotalDist = total2D;
+            }
+        });
+        
+        dist2D = minTotalDist === Infinity ? 0 : pixelsToMeters(minTotalDist);
+    } else {
+        // Fallback: Línea recta directa
+        const dx = cam.x - appState.rack.x;
+        const dy = cam.y - appState.rack.y;
+        dist2D = pixelsToMeters(Math.sqrt(dx*dx + dy*dy));
+    }
     
     // Subida vertical del Rack al Caño principal
     const verticalClimbRack = Math.max(0, appState.conduitHeight - appState.rackHeight);
@@ -1447,6 +1595,14 @@ function handleMouseDown(e) {
         return;
     }
     
+    // 1c. Modo Dibujo de Cañería
+    if (appState.isDrawingConduit) {
+        if (e.button !== 0) return; // Solo click izquierdo
+        appState.conduitPoints.push({ x: worldCoords.x, y: worldCoords.y });
+        draw();
+        return;
+    }
+
     // 1b. Modo Dibujo de Cota
     if (appState.isDrawingDimension) {
         if (e.button !== 0) return; // Solo click izquierdo
@@ -1570,8 +1726,9 @@ function handleMouseMove(e) {
     const worldCoords = getTransformedCoords(e.clientX, e.clientY);
     appState.currentMouseWorldCoords = worldCoords;
     
-    // Redibujar en tiempo real si estamos trazando una cota para ver la línea elástica
-    if (appState.isDrawingDimension && appState.dimensionPoints.length === 1) {
+    // Redibujar en tiempo real si estamos trazando una cota o cañería para ver la línea elástica
+    if ((appState.isDrawingDimension && appState.dimensionPoints.length === 1) ||
+        (appState.isDrawingConduit && appState.conduitPoints.length > 0)) {
         draw();
     }
     
@@ -2035,6 +2192,52 @@ function draw() {
         drawDimensionLine(ctx, appState.dimensionPoints[0], appState.currentMouseWorldCoords, 'Nueva Medida...', '#00d2ff', 1.5 / appState.zoomScale);
     }
     
+    // 7b. Dibujar Cañerías Guardadas
+    if (appState.conduits) {
+        appState.conduits.forEach(cond => {
+            if (cond.points.length < 2) return;
+            ctx.save();
+            ctx.strokeStyle = 'rgba(6, 182, 212, 0.75)'; // Color cañería (cyan)
+            ctx.lineWidth = 4 / appState.zoomScale;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            ctx.beginPath();
+            ctx.moveTo(cond.points[0].x, cond.points[0].y);
+            for (let i = 1; i < cond.points.length; i++) {
+                ctx.lineTo(cond.points[i].x, cond.points[i].y);
+            }
+            ctx.stroke();
+            
+            // Dibujar un borde blanco interior para estilo premium
+            ctx.strokeStyle = '#090b11';
+            ctx.lineWidth = 1.5 / appState.zoomScale;
+            ctx.stroke();
+            
+            ctx.restore();
+        });
+    }
+    
+    // 7c. Dibujar Cañería Temporal en trazado
+    if (appState.isDrawingConduit && appState.conduitPoints.length > 0 && appState.currentMouseWorldCoords) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(6, 182, 212, 0.6)';
+        ctx.lineWidth = 4 / appState.zoomScale;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.setLineDash([4 / appState.zoomScale, 4 / appState.zoomScale]);
+        
+        ctx.beginPath();
+        ctx.moveTo(appState.conduitPoints[0].x, appState.conduitPoints[0].y);
+        for (let i = 1; i < appState.conduitPoints.length; i++) {
+            ctx.lineTo(appState.conduitPoints[i].x, appState.conduitPoints[i].y);
+        }
+        ctx.lineTo(appState.currentMouseWorldCoords.x, appState.currentMouseWorldCoords.y);
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+    
     // 8. Dibujar Líneas de Cableado al Rack
     if (appState.rack && appState.showCables) {
         appState.cameras.forEach(cam => {
@@ -2204,6 +2407,9 @@ function toggleDrawDimensionMode() {
         btnStartCalibrate.textContent = 'Iniciar Calibración';
         calibrationInputBox.style.display = 'none';
         
+        appState.isDrawingConduit = false;
+        btnDrawConduit.classList.remove('active');
+        
         btnDrawDimension.classList.add('active');
         canvas.style.cursor = 'crosshair';
     } else {
@@ -2296,6 +2502,128 @@ function renderCotasList() {
 }
 
 // ==========================================================
+// 17b. GESTIÓN Y DIBUJO DE CAÑERÍAS (CONDUIT ROUTING)
+// ==========================================================
+
+function toggleDrawConduitMode() {
+    appState.isDrawingConduit = !appState.isDrawingConduit;
+    appState.conduitPoints = [];
+    
+    if (appState.isDrawingConduit) {
+        // Desactivar otros modos
+        appState.isCalibrating = false;
+        btnCalibrate.classList.remove('active');
+        btnStartCalibrate.classList.remove('btn-primary');
+        btnStartCalibrate.textContent = 'Iniciar Calibración';
+        calibrationInputBox.style.display = 'none';
+        
+        appState.isDrawingDimension = false;
+        btnDrawDimension.classList.remove('active');
+        dimensionModal.classList.remove('active');
+        
+        btnDrawConduit.classList.add('active');
+        canvas.style.cursor = 'crosshair';
+        
+        alert('Modo Cañería: Haz clics en el plano para trazar el caño. Doble clic en cualquier lugar para guardar el recorrido.');
+    } else {
+        cancelConduitLine();
+    }
+    draw();
+}
+
+function cancelConduitLine() {
+    appState.isDrawingConduit = false;
+    appState.conduitPoints = [];
+    btnDrawConduit.classList.remove('active');
+    canvas.style.cursor = 'grab';
+    draw();
+}
+
+function saveConduitLine() {
+    if (appState.conduitPoints.length < 2) {
+        alert('Por favor dibuja al menos 2 puntos para trazar una cañería.');
+        cancelConduitLine();
+        return;
+    }
+    
+    const condId = 'cond_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+    
+    // Guardar la cañería
+    appState.conduits.push({
+        id: condId,
+        points: [...appState.conduitPoints]
+    });
+    
+    cancelConduitLine();
+    renderConduitsList();
+    saveStateToLocalStorage();
+    renderActiveCamerasList(); // Recalcular distancias
+    draw();
+}
+
+function deleteConduit(id) {
+    appState.conduits = appState.conduits.filter(c => c.id !== id);
+    renderConduitsList();
+    saveStateToLocalStorage();
+    renderActiveCamerasList(); // Recalcular distancias
+    draw();
+}
+
+function renderConduitsList() {
+    if (!activeConduitsCount || !activeConduitsList) return;
+    
+    activeConduitsCount.textContent = appState.conduits.length;
+    
+    if (appState.conduits.length === 0) {
+        activeConduitsList.innerHTML = `
+            <div class="no-conduits-placeholder" style="font-size: 12px; color: var(--text-muted); text-align: center; padding: 12px; border: 1px dashed var(--border-color); border-radius: var(--radius-sm);">
+                No hay cañerías trazadas en el plano. Usa el botón "Cañería" arriba para trazar recorridos.
+            </div>
+        `;
+        return;
+    }
+    
+    activeConduitsList.innerHTML = '';
+    
+    appState.conduits.forEach((cond, idx) => {
+        // Calcular longitud
+        let lengthPx = 0;
+        for (let i = 0; i < cond.points.length - 1; i++) {
+            const dx = cond.points[i+1].x - cond.points[i].x;
+            const dy = cond.points[i+1].y - cond.points[i].y;
+            lengthPx += Math.sqrt(dx*dx + dy*dy);
+        }
+        const lengthM = pixelsToMeters(lengthPx);
+        
+        const item = document.createElement('div');
+        item.style.display = 'flex';
+        item.style.justify = 'space-between';
+        item.style.alignItems = 'center';
+        item.style.padding = '8px';
+        item.style.background = 'rgba(6, 182, 212, 0.1)';
+        item.style.border = '1px solid rgba(6, 182, 212, 0.3)';
+        item.style.borderRadius = '6px';
+        item.style.marginTop = '6px';
+        
+        item.innerHTML = `
+            <div style="font-size: 12px; font-weight: 500;">
+                <strong>Cañería #${idx + 1}:</strong> ${Math.round(lengthM)} m <span style="font-size: 10px; color: var(--text-muted);">(${cond.points.length} puntos)</span>
+            </div>
+            <button class="conduit-delete-btn" data-id="${cond.id}" title="Eliminar cañería" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; padding: 4px; border-radius: 4px; transition: all 0.2s;">
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
+        `;
+        
+        item.querySelector('.conduit-delete-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteConduit(cond.id);
+        });
+        
+        activeConduitsList.appendChild(item);
+    });
+}
+
+// ==========================================================
 // 18. GUARDAR Y CARGAR PROYECTOS (JSON)
 // ==========================================================
 
@@ -2336,7 +2664,12 @@ function exportProjectJSON() {
                 totalLength: appState.totalLength,
                 totalHeight: appState.totalHeight,
                 cameras: appState.cameras,
-                measurements: appState.measurements
+                measurements: appState.measurements,
+                rack: appState.rack,
+                showCables: appState.showCables,
+                rackHeight: appState.rackHeight,
+                conduitHeight: appState.conduitHeight,
+                conduits: appState.conduits
             };
             
             const jsonStr = JSON.stringify(projectData);
@@ -2379,6 +2712,15 @@ function importProjectJSON(e) {
                 appState.totalHeight = data.totalHeight || 6;
                 appState.cameras = data.cameras || [];
                 appState.measurements = data.measurements || [];
+                appState.rack = data.rack || { x: 500, y: 350, name: 'Rack Central' };
+                appState.showCables = data.showCables !== undefined ? data.showCables : true;
+                appState.rackHeight = data.rackHeight !== undefined ? data.rackHeight : 1.6;
+                appState.conduitHeight = data.conduitHeight !== undefined ? data.conduitHeight : 6.0;
+                appState.conduits = data.conduits || [];
+                
+                if (chkShowCables) chkShowCables.checked = appState.showCables;
+                if (rackHeightInput) rackHeightInput.value = appState.rackHeight;
+                if (conduitHeightInput) conduitHeightInput.value = appState.conduitHeight;
                 
                 calibTotalWidth.value = appState.totalWidth;
                 calibTotalLength.value = appState.totalLength;
@@ -2388,6 +2730,7 @@ function importProjectJSON(e) {
                 updateScaleUI();
                 renderActiveCamerasList();
                 renderCotasList();
+                renderConduitsList();
                 saveStateToLocalStorage();
                 
                 alert('¡Proyecto cargado con éxito!');
@@ -2501,6 +2844,31 @@ function getCombinedCanvasDataURL() {
     if (appState.measurements) {
         appState.measurements.forEach(m => {
             drawDimensionLine(ectx, m.p1, m.p2, m.label, '#00d2ff', 2);
+        });
+    }
+    
+    // 7b. Dibujar Cañerías Guardadas en Exportación
+    if (appState.conduits) {
+        appState.conduits.forEach(cond => {
+            if (cond.points.length < 2) return;
+            ectx.save();
+            ectx.strokeStyle = 'rgba(6, 182, 212, 0.75)'; // Cyan
+            ectx.lineWidth = 6;
+            ectx.lineCap = 'round';
+            ectx.lineJoin = 'round';
+            
+            ectx.beginPath();
+            ectx.moveTo(cond.points[0].x, cond.points[0].y);
+            for (let i = 1; i < cond.points.length; i++) {
+                ectx.lineTo(cond.points[i].x, cond.points[i].y);
+            }
+            ectx.stroke();
+            
+            ectx.strokeStyle = '#090b11';
+            ectx.lineWidth = 2;
+            ectx.stroke();
+            
+            ectx.restore();
         });
     }
     
