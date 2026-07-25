@@ -234,7 +234,19 @@
                 <section class="panel-section">
                     <h3 class="section-title">Distancia al Rack Central</h3>
                     <p class="section-desc">Arrastra el 🟦 <strong>Rack Central</strong> en el mapa para medir distancias físicas.</p>
-                    <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">
+                    
+                    <div class="form-row" style="display: flex; gap: 8px; margin-top: 8px;">
+                        <div class="form-group col" style="flex: 1;">
+                            <label for="rackHeight" style="font-size: 11px;">Alt. Rack (m)</label>
+                            <input type="number" id="rackHeight" value="1.6" min="0" max="15" step="0.1" style="width: 100%; padding: 4px 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-main); font-size: 12px;">
+                        </div>
+                        <div class="form-group col" style="flex: 1;">
+                            <label for="conduitHeight" style="font-size: 11px;">Alt. Caño (m)</label>
+                            <input type="number" id="conduitHeight" value="6.0" min="0" max="25" step="0.5" style="width: 100%; padding: 4px 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-main); font-size: 12px;">
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
                         <input type="checkbox" id="chkShowCables" checked style="width: 16px; height: 16px; cursor: pointer;">
                         <label for="chkShowCables" style="margin: 0; cursor: pointer; font-size: 12px; font-weight: 500;">
                             Ver líneas y distancias de cámaras al Rack

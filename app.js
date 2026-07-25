@@ -348,7 +348,9 @@ let appState = {
     // Rack y Tendido de Cables
     rack: { x: 500, y: 350, name: 'Rack Central' },
     showCables: true,
-    isDraggingRack: false
+    isDraggingRack: false,
+    rackHeight: 1.6,
+    conduitHeight: 6.0
 };
 
 // 3. ELEMENTOS DEL DOM
@@ -427,6 +429,8 @@ const reportLaborBudget = document.getElementById('reportLaborBudget');
 const reportProjectDate = document.getElementById('reportProjectDate');
 const reportObservations = document.getElementById('reportObservations');
 const chkShowCables = document.getElementById('chkShowCables');
+const rackHeightInput = document.getElementById('rackHeight');
+const conduitHeightInput = document.getElementById('conduitHeight');
 
 // 4. INICIALIZACIÓN
 window.addEventListener('DOMContentLoaded', () => {
@@ -524,6 +528,22 @@ function setupEventListeners() {
         draw();
     });
     
+    // Inputs de Alturas para Rack 3D
+    rackHeightInput.addEventListener('input', e => {
+        let val = parseFloat(e.target.value);
+        appState.rackHeight = isNaN(val) ? 1.6 : val;
+        saveStateToLocalStorage();
+        renderActiveCamerasList();
+        draw();
+    });
+    conduitHeightInput.addEventListener('input', e => {
+        let val = parseFloat(e.target.value);
+        appState.conduitHeight = isNaN(val) ? 6.0 : val;
+        saveStateToLocalStorage();
+        renderActiveCamerasList();
+        draw();
+    });
+
     // Botones de Guardar / Cargar Proyectos (JSON) e Impresión
     btnExportProject.addEventListener('click', exportProjectJSON);
     btnImportProjectTrigger.addEventListener('click', () => projectJSONUpload.click());
@@ -1161,6 +1181,22 @@ function clearAllCameras() {
     }
 }
 
+// Función para calcular la distancia real 3D (Opción B)
+function calculateRealDistance(cam) {
+    if (!appState.rack) return 0;
+    const dx = cam.x - appState.rack.x;
+    const dy = cam.y - appState.rack.y;
+    const dist2D = pixelsToMeters(Math.sqrt(dx*dx + dy*dy));
+    
+    // Subida vertical del Rack al Caño principal
+    const verticalClimbRack = Math.max(0, appState.conduitHeight - appState.rackHeight);
+    
+    // Subida/bajada vertical desde el Caño principal hasta la cámara
+    const verticalChangeCam = Math.abs((cam.height || 3) - appState.conduitHeight);
+    
+    return dist2D + verticalClimbRack + verticalChangeCam;
+}
+
 // 12. GESTIÓN DEL PANEL DE CÁMARAS ACTIVAS
 function renderActiveCamerasList() {
     activeCamCount.textContent = appState.cameras.length;
@@ -1191,7 +1227,8 @@ function renderActiveCamerasList() {
         // Calcular distancia al rack
         const dx = cam.x - (appState.rack ? appState.rack.x : 500);
         const dy = cam.y - (appState.rack ? appState.rack.y : 350);
-        const distToRack = pixelsToMeters(Math.sqrt(dx*dx + dy*dy));
+        const dist2D = pixelsToMeters(Math.sqrt(dx*dx + dy*dy));
+        const distReal = calculateRealDistance(cam);
         
         card.innerHTML = `
             <div class="cam-card-header">
@@ -1202,14 +1239,14 @@ function renderActiveCamerasList() {
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <span class="cam-card-brand">${cam.brandName}</span>
                     <button class="cam-card-delete" data-id="${cam.id}" title="Eliminar Cámara">
-                        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2 2v2"></path></svg>
                     </button>
                 </div>
             </div>
             <div class="cam-card-body">
                 <div style="color: var(--text-muted); font-size: 10px; margin-bottom: 2px; display: flex; justify-content: space-between;">
                     <span>${cam.model} (${cam.lens})</span>
-                    <span style="color: var(--color-primary); font-weight: bold; font-family: monospace; font-size: 11px;">Distancia: ${Math.round(distToRack)}m</span>
+                    <span style="color: var(--color-primary); font-weight: bold; font-family: monospace; font-size: 11px;" title="Distancia real con alturas (Plano 2D: ${Math.round(dist2D)}m)">Dist. Real: ${Math.round(distReal)}m</span>
                 </div>
                 <div class="cam-card-controls">
                     <!-- Rotación -->
@@ -1694,7 +1731,9 @@ function saveStateToLocalStorage() {
         totalHeight: appState.totalHeight,
         measurements: appState.measurements,
         rack: appState.rack,
-        showCables: appState.showCables
+        showCables: appState.showCables,
+        rackHeight: appState.rackHeight,
+        conduitHeight: appState.conduitHeight
     };
     localStorage.setItem('camPlanner_workspaceState', JSON.stringify(dataToSave));
 }
@@ -1714,9 +1753,17 @@ function loadStateFromLocalStorage() {
                 appState.measurements = data.measurements || [];
                 appState.rack = data.rack || { x: 500, y: 350, name: 'Rack Central' };
                 appState.showCables = data.showCables !== undefined ? data.showCables : true;
+                appState.rackHeight = data.rackHeight !== undefined ? data.rackHeight : 1.6;
+                appState.conduitHeight = data.conduitHeight !== undefined ? data.conduitHeight : 6.0;
                 
                 if (chkShowCables) {
                     chkShowCables.checked = appState.showCables;
+                }
+                if (rackHeightInput) {
+                    rackHeightInput.value = appState.rackHeight;
+                }
+                if (conduitHeightInput) {
+                    conduitHeightInput.value = appState.conduitHeight;
                 }
                 
                 calibTotalWidth.value = appState.totalWidth;
@@ -1993,8 +2040,7 @@ function draw() {
         appState.cameras.forEach(cam => {
             const dx = cam.x - appState.rack.x;
             const dy = cam.y - appState.rack.y;
-            const pixelDist = Math.sqrt(dx*dx + dy*dy);
-            const metersDist = pixelsToMeters(pixelDist);
+            const distReal = calculateRealDistance(cam);
             
             ctx.save();
             ctx.strokeStyle = 'rgba(6, 182, 212, 0.45)'; // Cyan translúcido
@@ -2017,7 +2063,7 @@ function draw() {
             
             ctx.save();
             ctx.fillStyle = 'rgba(9, 11, 17, 0.85)';
-            const distStr = `${Math.round(metersDist)}m`;
+            const distStr = `${Math.round(distReal)}m`;
             const dW = ctx.measureText(distStr).width;
             ctx.fillRect(midX - dW/2 - 2, midY - 6, dW + 4, 12);
             ctx.restore();
@@ -2463,8 +2509,7 @@ function getCombinedCanvasDataURL() {
         appState.cameras.forEach(cam => {
             const dx = cam.x - appState.rack.x;
             const dy = cam.y - appState.rack.y;
-            const pixelDist = Math.sqrt(dx*dx + dy*dy);
-            const metersDist = pixelsToMeters(pixelDist);
+            const distReal = calculateRealDistance(cam);
             
             ectx.save();
             ectx.strokeStyle = 'rgba(6, 182, 212, 0.5)';
@@ -2487,7 +2532,7 @@ function getCombinedCanvasDataURL() {
             
             ectx.save();
             ectx.fillStyle = 'rgba(9, 11, 17, 0.85)';
-            const distStr = `${Math.round(metersDist)}m`;
+            const distStr = `${Math.round(distReal)}m`;
             const dW = ectx.measureText(distStr).width;
             ectx.fillRect(midX - dW/2 - 2, midY - 6, dW + 4, 12);
             ectx.restore();
@@ -2566,9 +2611,7 @@ function printTechnicalReport() {
             // Filas de cámaras y cálculo de distancia al rack
             let camerasRows = '';
             appState.cameras.forEach((cam, idx) => {
-                const dx = cam.x - (appState.rack ? appState.rack.x : 500);
-                const dy = cam.y - (appState.rack ? appState.rack.y : 350);
-                const distToRack = pixelsToMeters(Math.sqrt(dx*dx + dy*dy));
+                const distReal = calculateRealDistance(cam);
                 
                 camerasRows += `
                     <tr>
@@ -2580,7 +2623,7 @@ function printTechnicalReport() {
                         <td style="text-align:center;">${cam.height || 3} m</td>
                         <td style="text-align:center;">${Math.round(cam.fov)}°</td>
                         <td style="text-align:center;">${Math.round(cam.range)} m</td>
-                        <td style="text-align:center; font-family: monospace; font-weight: 500;">${Math.round(distToRack)} m</td>
+                        <td style="text-align:center; font-family: monospace; font-weight: 500;">${Math.round(distReal)} m</td>
                         <td><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${cam.color}; margin-right:6px; vertical-align:middle;"></span>${cam.color}</td>
                     </tr>
                 `;
@@ -2689,7 +2732,7 @@ function printTechnicalReport() {
                 
                 ${appState.cameras.length > 0 ? `
                 <div style="font-size: 10px; margin-top: 8px; color: #555; border-top: 1px dashed #ccc; padding-top: 8px; margin-bottom: 20px;">
-                    <span>* Las distancias indicadas representan la distancia lineal directa en el plano desde el Rack Central hasta la cámara.</span>
+                    <span>* La distancia al Rack se calcula en 3D: incluye la distancia horizontal plana más la subida vertical desde el Rack (a ${appState.rackHeight}m) hasta la cañería estanca (a ${appState.conduitHeight}m) y el tramo vertical hasta la altura de cada cámara.</span>
                 </div>
                 ` : ''}
                 
