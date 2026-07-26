@@ -3277,7 +3277,7 @@ function printTechnicalReport() {
                 
                 <div class="print-footer">
                     <p>Reporte técnico comercial generado por CamPlanner PRO en representación de El Cóndor.</p>
-                    <p>© 2026 El Cóndor Servicios Integrales • Quilmes / Hudson, Buenos Aires.</p>
+                    <p>© 2026 El Cóndor Servicios Integrales • Avellaneda / Wilde, Buenos Aires.</p>
                 </div>
             `;
             
