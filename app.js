@@ -89,6 +89,15 @@ const CAMERA_PRESETS = [
     {
         brand: 'uniview',
         brandName: 'Uniview',
+        model: 'TIC2621SR-F3-4F4AC-VD (Bala Térmica Dual 4MP)',
+        fov: 89.9,
+        range: 60,
+        lens: '4.0mm / Térmica 3.2mm',
+        color: '#ef4444'
+    },
+    {
+        brand: 'uniview',
+        brandName: 'Uniview',
         model: 'IPC6622SR-X33-VF (Domo PTZ Easy 2MP)',
         fov: 60.6,
         range: 150,
