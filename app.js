@@ -3277,7 +3277,7 @@ function printTechnicalReport() {
                 
                 <div class="print-footer" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed #ccc; padding-top: 10px; margin-top: 30px; font-size: 11px; color: #333;">
                     <div><strong>El Cóndor Servicios Integrales</strong> | Cel: 11 2613-9527</div>
-                    <div><strong>Web:</strong> www.elcondorservicios.com.ar</div>
+                    <div><strong>Web:</strong> elcondorclimatizacion-oss.github.io/elcondor-/</div>
                 </div>
             `;
             
