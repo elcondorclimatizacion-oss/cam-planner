@@ -80,6 +80,15 @@ const CAMERA_PRESETS = [
     {
         brand: 'uniview',
         brandName: 'Uniview',
+        model: 'IPC2324LB-ADZK-G (Bala Varifocal Easy 4MP)',
+        fov: 102.8,
+        range: 50,
+        lens: '2.8mm - 12mm',
+        color: '#0284c7'
+    },
+    {
+        brand: 'uniview',
+        brandName: 'Uniview',
         model: 'IPC6622SR-X33-VF (Domo PTZ Easy 2MP)',
         fov: 60.6,
         range: 150,
